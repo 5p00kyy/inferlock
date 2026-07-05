@@ -1,0 +1,18 @@
+[Unit]
+Description=GPU-safe proxy for llama.cpp public endpoint
+After=network.target llama-server.service
+Wants=llama-server.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/llm-gpu-coordinator
+Environment=LLAMA_PROXY_BACKEND=http://127.0.0.1:8082
+Environment=INFERENCE_GPU_LOCK=/run/inference-gpu.lock
+Environment=INFERENCE_COORDINATOR=/opt/llm-gpu-coordinator/scripts/inference-coordinator.sh
+ExecStart=/usr/bin/python3 -m uvicorn proxies.llama-safe-proxy:app --host 0.0.0.0 --port 8080
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
