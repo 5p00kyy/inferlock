@@ -2,9 +2,11 @@
 set -euo pipefail
 
 ACTION="${1:-}"
+SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 LLAMA_BACKEND="${LLAMA_BACKEND:-http://127.0.0.1:8082}"
 VLLM_BACKEND="${VLLM_BACKEND:-http://127.0.0.1:8090}"
 VLLM_STOP="${VLLM_STOP:-/opt/vllm/stop.sh}"
+INFERENCE_GPU_LOCK="${INFERENCE_GPU_LOCK:-/run/inference-gpu.lock}"
 LLAMA_UNLOAD_TIMEOUT="${LLAMA_UNLOAD_TIMEOUT:-180}"
 VLLM_STOP_TIMEOUT="${VLLM_STOP_TIMEOUT:-120}"
 
@@ -13,7 +15,16 @@ if [[ -n "${LLAMA_API_KEY_FILE:-}" && -r "${LLAMA_API_KEY_FILE}" ]]; then
 else
   LLAMA_API_KEY="${LLAMA_API_KEY:-}"
 fi
-export LLAMA_BACKEND VLLM_BACKEND VLLM_STOP LLAMA_API_KEY LLAMA_UNLOAD_TIMEOUT VLLM_STOP_TIMEOUT
+export LLAMA_BACKEND VLLM_BACKEND VLLM_STOP INFERENCE_GPU_LOCK LLAMA_API_KEY LLAMA_UNLOAD_TIMEOUT VLLM_STOP_TIMEOUT
+
+with_gpu_lock() {
+  local unlocked_action="$1"
+  if [[ "${INFERENCE_GPU_LOCK_HELD:-0}" == "1" ]]; then
+    "$SCRIPT_PATH" "$unlocked_action"
+  else
+    env INFERENCE_GPU_LOCK_HELD=1 flock -x "$INFERENCE_GPU_LOCK" "$SCRIPT_PATH" "$unlocked_action"
+  fi
+}
 
 unload_llama() {
   python3 - <<'PY'
@@ -80,6 +91,12 @@ PY
 }
 
 case "$ACTION" in
+  prepare-vllm)
+    with_gpu_lock prepare-vllm-unlocked
+    ;;
+  prepare-llama)
+    with_gpu_lock prepare-llama-unlocked
+    ;;
   prepare-vllm-unlocked)
     unload_llama
     ;;
@@ -92,7 +109,7 @@ case "$ACTION" in
     nvidia-smi --query-gpu=index,memory.used,memory.total,utilization.gpu --format=csv,noheader,nounits || true
     ;;
   *)
-    echo "usage: $0 {prepare-vllm-unlocked|prepare-llama-unlocked|status}" >&2
+    echo "usage: $0 {prepare-vllm|prepare-llama|prepare-vllm-unlocked|prepare-llama-unlocked|status}" >&2
     exit 2
     ;;
 esac
