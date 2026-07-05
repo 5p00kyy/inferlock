@@ -1,10 +1,30 @@
 # llm-gpu-coordinator
 
+Working public name: **Inferlock**.
+
 Small coordination layer for machines that run multiple local LLM engines on the same GPU pool, for example a llama.cpp router and a vLLM OpenAI-compatible server.
 
 The goal is simple: requests to either public endpoint should not accidentally overlap GPU-heavy engines. If llama.cpp is about to serve a request, vLLM is stopped first. If vLLM is about to serve a request, loaded llama.cpp router models are unloaded first. A shared file lock serializes the handoff and stays held for the full request, including streaming responses.
 
-This started as homelab glue. The public-worthy shape is a narrower "GPU lease" helper for local inference engines, not another full LLM gateway. See `docs/public-roadmap.md`.
+This started as homelab glue. The public-worthy shape is a narrower "GPU lease" helper for local inference engines, not another full LLM gateway. See `docs/public-roadmap.md` and `docs/landscape.md`.
+
+## When to use this
+
+Use this when several cooperating local inference engines can all claim the same GPU and you need a conservative handoff guard before any one of them touches CUDA.
+
+Good fit:
+
+- one workstation or homelab box with llama.cpp and vLLM sharing the same GPU pool
+- a custom router that needs to stop/unload competing engines before proxying a request
+- systemd or shell-managed inference services that need one shared lock contract
+- streaming requests where the lock must stay held until the stream closes
+
+Not the right tool:
+
+- use llama-swap if you mainly need model/process hot-swapping and it already supervises your engines
+- use LiteLLM or Portkey if you need provider routing, keys, budgets, retries, or API accounting
+- use LoxyRouter if you have multiple already-running backends and want warmth-aware routing
+- use vLLM Production Stack if you are building a Kubernetes/distributed vLLM deployment
 
 ## Components
 
@@ -40,6 +60,14 @@ export INFERENCE_GPU_LOCK=/run/inference-gpu.lock
 
 `LLAMA_API_KEY` is also accepted, but a file is preferred. Do not hard-code secrets in scripts or units.
 
+For generic/fake adapters, `LLAMA_UNLOAD_CMD` can replace the built-in llama.cpp unload call:
+
+```bash
+export LLAMA_UNLOAD_CMD='systemctl stop some-llama-service'
+```
+
+Configured shell commands are trusted operator configuration. Do not pass untrusted user input into them.
+
 ## Coordinator commands
 
 ```bash
@@ -65,9 +93,12 @@ Both included examples follow that rule.
 ## Testing
 
 ```bash
+python3 -m pip install -r requirements-dev.txt
 python3 -m pytest
 bash -n scripts/inference-coordinator.sh examples/vllm/start-wrapper-snippet.sh
 ```
+
+CI also runs ShellCheck and a small secret-pattern smoke check.
 
 ## Status
 

@@ -7,6 +7,7 @@ LLAMA_BACKEND="${LLAMA_BACKEND:-http://127.0.0.1:8082}"
 VLLM_BACKEND="${VLLM_BACKEND:-http://127.0.0.1:8090}"
 VLLM_STOP="${VLLM_STOP:-/opt/vllm/stop.sh}"
 INFERENCE_GPU_LOCK="${INFERENCE_GPU_LOCK:-/run/inference-gpu.lock}"
+LLAMA_UNLOAD_CMD="${LLAMA_UNLOAD_CMD:-}"
 LLAMA_UNLOAD_TIMEOUT="${LLAMA_UNLOAD_TIMEOUT:-180}"
 VLLM_STOP_TIMEOUT="${VLLM_STOP_TIMEOUT:-120}"
 
@@ -15,7 +16,7 @@ if [[ -n "${LLAMA_API_KEY_FILE:-}" && -r "${LLAMA_API_KEY_FILE}" ]]; then
 else
   LLAMA_API_KEY="${LLAMA_API_KEY:-}"
 fi
-export LLAMA_BACKEND VLLM_BACKEND VLLM_STOP INFERENCE_GPU_LOCK LLAMA_API_KEY LLAMA_UNLOAD_TIMEOUT VLLM_STOP_TIMEOUT
+export LLAMA_BACKEND VLLM_BACKEND VLLM_STOP INFERENCE_GPU_LOCK LLAMA_UNLOAD_CMD LLAMA_API_KEY LLAMA_UNLOAD_TIMEOUT VLLM_STOP_TIMEOUT
 
 with_gpu_lock() {
   local unlocked_action="$1"
@@ -27,6 +28,11 @@ with_gpu_lock() {
 }
 
 unload_llama() {
+  if [[ -n "$LLAMA_UNLOAD_CMD" ]]; then
+    bash -c "$LLAMA_UNLOAD_CMD"
+    return
+  fi
+
   python3 - <<'PY'
 import json, os, time, urllib.request, urllib.error
 base = os.environ.get('LLAMA_BACKEND', 'http://127.0.0.1:8082')

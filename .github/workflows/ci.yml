@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+      - name: Python tests
+        run: python -m pytest -q
+      - name: Shell syntax and lint
+        run: |
+          bash -n scripts/inference-coordinator.sh examples/vllm/start-wrapper-snippet.sh
+          shellcheck scripts/inference-coordinator.sh examples/vllm/start-wrapper-snippet.sh
+      - name: Secret pattern smoke check
+        run: |
+          ! git grep -nE '(sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16})'
