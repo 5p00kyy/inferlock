@@ -3,10 +3,12 @@
 This repository should not try to be a full OpenAI gateway. Existing projects already cover that layer well:
 
 - llama-swap: model/process hot swapping and idle unload in front of OpenAI-compatible engines.
+- ClaraCore and llama-swap boilerplates: easier deployment and stack recipes for llama.cpp/vLLM/Ollama.
 - LiteLLM/Portkey: API normalization, keys, routing, retries, accounting.
 - LoxyRouter/SmarterRouter-style projects: backend/model routing, VRAM guards, model choice, caching.
+- vLLM Production Stack: Kubernetes/distributed vLLM serving.
 
-The reusable gap here is narrower: an operational lease around shared GPU ownership.
+The reusable gap here is narrower: an operational lease around shared GPU ownership. See `docs/landscape.md` for research notes.
 
 ## Proposed public positioning
 
@@ -42,4 +44,4 @@ Core promise:
 - Tests proving locks are held across streaming responses.
 - Tests proving locks are released after upstream failure/cancellation.
 - Systemd examples that keep private backend ports loopback-only.
-- README comparison explaining why this is complementary to llama-swap rather than a clone.
+- README comparison explaining when to use llama-swap, LoxyRouter, SmarterRouter, LiteLLM, vLLM Production Stack, or this project.
