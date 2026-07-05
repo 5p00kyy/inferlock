@@ -9,7 +9,7 @@ import os
 import subprocess
 
 GPU_LOCK_PATH = os.environ.get("INFERENCE_GPU_LOCK", "/run/inference-gpu.lock")
-COORDINATOR = os.environ.get("INFERENCE_COORDINATOR", "/opt/llm-gpu-coordinator/scripts/inference-coordinator.sh")
+COORDINATOR = os.environ.get("INFERENCE_COORDINATOR", "/opt/inferlock/scripts/inference-coordinator.sh")
 
 
 def acquire_gpu_lock():

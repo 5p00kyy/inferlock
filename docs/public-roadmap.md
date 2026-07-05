@@ -12,7 +12,7 @@ The reusable gap here is narrower: an operational lease around shared GPU owners
 
 ## Proposed public positioning
 
-Working name: **Inferlock**.
+Project name: **Inferlock**.
 
 Subtitle: exclusive GPU leases for local inference engines.
 

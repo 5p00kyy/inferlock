@@ -17,7 +17,7 @@ from fastapi.responses import StreamingResponse
 
 BACKEND = os.environ.get("LLAMA_PROXY_BACKEND", "http://127.0.0.1:8082")
 LOCK_PATH = os.environ.get("INFERENCE_GPU_LOCK", "/run/inference-gpu.lock")
-COORDINATOR = os.environ.get("INFERENCE_COORDINATOR", "/opt/llm-gpu-coordinator/inference-coordinator.sh")
+COORDINATOR = os.environ.get("INFERENCE_COORDINATOR", "/opt/inferlock/scripts/inference-coordinator.sh")
 PREPARE_TIMEOUT = float(os.environ.get("PREPARE_LLAMA_TIMEOUT", "180"))
 
 app = FastAPI(title="llama.cpp GPU-safe proxy")

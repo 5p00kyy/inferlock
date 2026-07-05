@@ -1,6 +1,6 @@
-# llm-gpu-coordinator
+# Inferlock
 
-Working public name: **Inferlock**.
+Exclusive GPU leases for local LLM inference engines.
 
 Small coordination layer for machines that run multiple local LLM engines on the same GPU pool, for example a llama.cpp router and a vLLM OpenAI-compatible server.
 
@@ -45,6 +45,18 @@ Example layout:
 - Shared lock: `/run/inference-gpu.lock`.
 
 Direct access to the private backend ports bypasses coordination. Keep those loopback-only.
+
+## Install
+
+```bash
+git clone https://github.com/5p00kyy/inferlock.git
+cd inferlock
+python3 -m venv .venv
+. .venv/bin/activate
+python3 -m pip install -r requirements.txt
+```
+
+For a system install, copy or clone the repo to `/opt/inferlock`, then adapt the example systemd units in `examples/systemd/`. Keep real inference backends loopback-only and expose only coordinated proxy/router ports.
 
 ## Required environment
 
