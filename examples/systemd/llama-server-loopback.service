@@ -8,6 +8,8 @@ WorkingDirectory=/opt/llama
 Environment=LLAMA_BIND_HOST=127.0.0.1
 Environment=LLAMA_BIND_PORT=8082
 Environment=LLAMA_IDLE_UNLOAD_SECONDS=1800
+Environment=LLAMA_MODELS_DIR=/opt/llama/models
+Environment=LLAMA_MODELS_PRESET=/opt/llama/presets.ini
 ExecStart=/usr/bin/bash /opt/llama/llama-server.sh
 Restart=on-failure
 RestartSec=10

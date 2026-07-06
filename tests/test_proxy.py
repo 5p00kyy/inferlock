@@ -113,6 +113,27 @@ async def test_streaming_gpu_request_holds_lock_until_stream_closes(proxy_env):
 
 def test_safe_reads_do_not_need_gpu():
     assert proxy_module.needs_gpu("GET", "v1/models") is False
+    assert proxy_module.needs_gpu("GET", "api/v1/models") is False
     assert proxy_module.needs_gpu("GET", "health") is False
     assert proxy_module.needs_gpu("POST", "v1/chat/completions") is True
     assert proxy_module.body_requests_stream(b'{"stream": true}') is True
+
+
+
+@pytest.mark.asyncio
+async def test_gpu_request_lock_timeout_returns_503(proxy_env, monkeypatch):
+    holder = open(proxy_env, "w")
+    fcntl.flock(holder, fcntl.LOCK_EX)
+    monkeypatch.setattr(proxy_module, "LOCK_TIMEOUT", 0.05)
+    monkeypatch.setattr(proxy_module, "LOCK_RETRY_SECONDS", 0.01)
+
+    try:
+        async with httpx.AsyncClient(transport=ASGITransport(app=proxy_module.app), base_url="http://proxy") as client:
+            response = await client.post("/v1/chat/completions", json={"model": "demo"})
+    finally:
+        fcntl.flock(holder, fcntl.LOCK_UN)
+        holder.close()
+
+    assert response.status_code == 503
+    assert "timed out waiting for GPU lock" in response.text
+    assert_lock_available(proxy_env)

@@ -8,6 +8,8 @@ Type=simple
 WorkingDirectory=/opt/inferlock
 Environment=LLAMA_PROXY_BACKEND=http://127.0.0.1:8082
 Environment=INFERENCE_GPU_LOCK=/run/inference-gpu.lock
+Environment=INFERENCE_GPU_LOCK_TIMEOUT=300
+Environment=INFERENCE_GPU_LOCK_RETRY_SECONDS=0.1
 Environment=INFERENCE_COORDINATOR=/opt/inferlock/scripts/inference-coordinator.sh
 ExecStart=/usr/bin/python3 -m uvicorn proxies.llama-safe-proxy:app --host 0.0.0.0 --port 8080
 Restart=on-failure

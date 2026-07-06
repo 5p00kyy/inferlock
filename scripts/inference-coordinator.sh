@@ -7,6 +7,7 @@ LLAMA_BACKEND="${LLAMA_BACKEND:-http://127.0.0.1:8082}"
 VLLM_BACKEND="${VLLM_BACKEND:-http://127.0.0.1:8090}"
 VLLM_STOP="${VLLM_STOP:-/opt/vllm/stop.sh}"
 INFERENCE_GPU_LOCK="${INFERENCE_GPU_LOCK:-/run/inference-gpu.lock}"
+INFERENCE_GPU_LOCK_TIMEOUT="${INFERENCE_GPU_LOCK_TIMEOUT:-300}"
 LLAMA_UNLOAD_CMD="${LLAMA_UNLOAD_CMD:-}"
 LLAMA_UNLOAD_TIMEOUT="${LLAMA_UNLOAD_TIMEOUT:-180}"
 VLLM_STOP_TIMEOUT="${VLLM_STOP_TIMEOUT:-120}"
@@ -16,14 +17,14 @@ if [[ -n "${LLAMA_API_KEY_FILE:-}" && -r "${LLAMA_API_KEY_FILE}" ]]; then
 else
   LLAMA_API_KEY="${LLAMA_API_KEY:-}"
 fi
-export LLAMA_BACKEND VLLM_BACKEND VLLM_STOP INFERENCE_GPU_LOCK LLAMA_UNLOAD_CMD LLAMA_API_KEY LLAMA_UNLOAD_TIMEOUT VLLM_STOP_TIMEOUT
+export LLAMA_BACKEND VLLM_BACKEND VLLM_STOP INFERENCE_GPU_LOCK INFERENCE_GPU_LOCK_TIMEOUT LLAMA_UNLOAD_CMD LLAMA_API_KEY LLAMA_UNLOAD_TIMEOUT VLLM_STOP_TIMEOUT
 
 with_gpu_lock() {
   local unlocked_action="$1"
   if [[ "${INFERENCE_GPU_LOCK_HELD:-0}" == "1" ]]; then
     "$SCRIPT_PATH" "$unlocked_action"
   else
-    env INFERENCE_GPU_LOCK_HELD=1 flock -x "$INFERENCE_GPU_LOCK" "$SCRIPT_PATH" "$unlocked_action"
+    env INFERENCE_GPU_LOCK_HELD=1 flock -x --timeout "$INFERENCE_GPU_LOCK_TIMEOUT" "$INFERENCE_GPU_LOCK" "$SCRIPT_PATH" "$unlocked_action"
   fi
 }
 
@@ -61,7 +62,9 @@ for model in [m for m in loaded_models() if m]:
         with req('/models/unload', {'model': model}, timeout=30) as r:
             r.read()
     except urllib.error.HTTPError as e:
-        if e.code not in (404, 409):
+        body = e.read().decode(errors='replace').lower()
+        already_unloaded = e.code == 400 and 'model' in body and 'not found' in body
+        if e.code not in (404, 409) and not already_unloaded:
             raise
 
 deadline = time.time() + timeout
@@ -77,7 +80,7 @@ PY
 
 stop_vllm() {
   if [[ -x "$VLLM_STOP" ]]; then
-    "$VLLM_STOP" >/dev/null 2>&1 || true
+    "$VLLM_STOP" >/dev/null 2>&1
   fi
   python3 - <<'PY'
 import os, time, urllib.request

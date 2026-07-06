@@ -68,7 +68,11 @@ export VLLM_BACKEND=http://127.0.0.1:8090
 export LLAMA_API_KEY_FILE=/run/secrets/llama-api-key
 export VLLM_STOP=/opt/vllm/stop.sh
 export INFERENCE_GPU_LOCK=/run/inference-gpu.lock
+export INFERENCE_GPU_LOCK_TIMEOUT=300
+export INFERENCE_GPU_LOCK_RETRY_SECONDS=0.1
 ```
+
+`INFERENCE_GPU_LOCK_TIMEOUT` bounds lock waits so callers fail instead of hanging forever. `INFERENCE_GPU_LOCK_RETRY_SECONDS` controls the Python proxy/router retry interval.
 
 `LLAMA_API_KEY` is also accepted, but a file is preferred. Do not hard-code secrets in scripts or units.
 

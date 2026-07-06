@@ -10,6 +10,7 @@ import fcntl
 import json
 import os
 import subprocess
+import time
 
 import httpx
 from fastapi import FastAPI, Request, Response
@@ -19,6 +20,8 @@ BACKEND = os.environ.get("LLAMA_PROXY_BACKEND", "http://127.0.0.1:8082")
 LOCK_PATH = os.environ.get("INFERENCE_GPU_LOCK", "/run/inference-gpu.lock")
 COORDINATOR = os.environ.get("INFERENCE_COORDINATOR", "/opt/inferlock/scripts/inference-coordinator.sh")
 PREPARE_TIMEOUT = float(os.environ.get("PREPARE_LLAMA_TIMEOUT", "180"))
+LOCK_TIMEOUT = float(os.environ.get("INFERENCE_GPU_LOCK_TIMEOUT", "300"))
+LOCK_RETRY_SECONDS = float(os.environ.get("INFERENCE_GPU_LOCK_RETRY_SECONDS", "0.1"))
 
 app = FastAPI(title="llama.cpp GPU-safe proxy")
 client = httpx.AsyncClient(timeout=None)
@@ -28,6 +31,7 @@ SAFE_READS = {
     ("GET", "props"),
     ("GET", "models"),
     ("GET", "v1/models"),
+    ("GET", "api/v1/models"),
 }
 
 
@@ -44,8 +48,16 @@ def needs_gpu(method: str, path: str) -> bool:
 
 def acquire_gpu_lock():
     f = open(LOCK_PATH, "w")
-    fcntl.flock(f, fcntl.LOCK_EX)
-    return f
+    deadline = time.monotonic() + LOCK_TIMEOUT
+    while True:
+        try:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return f
+        except BlockingIOError:
+            if time.monotonic() >= deadline:
+                f.close()
+                raise TimeoutError(f"timed out waiting for GPU lock {LOCK_PATH}")
+            time.sleep(min(LOCK_RETRY_SECONDS, max(0.0, deadline - time.monotonic())))
 
 
 def release_gpu_lock(f):
@@ -85,8 +97,8 @@ async def proxy(request: Request, path: str):
     lock_file = None
 
     if needs_gpu(method, path):
-        lock_file = await asyncio.to_thread(acquire_gpu_lock)
         try:
+            lock_file = await asyncio.to_thread(acquire_gpu_lock)
             await asyncio.to_thread(prepare_llama)
         except Exception as e:
             release_gpu_lock(lock_file)
